@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helios Platform — Deployment Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08080c;
+    --surface: #0f0f18;
+    --border: #1e293b;
+    --border-hover: #334155;
+    --text: #c9d1d9;
+    --text-bright: #e2e8f0;
+    --text-dim: #64748b;
+    --text-muted: #475569;
+    --text-ghost: #334155;
+    --green: #4ade80;
+    --green-dim: #14532d;
+    --blue: #60a5fa;
+    --blue-dim: #1e3a5f;
+    --purple: #c084fc;
+    --purple-dim: #2e1a4d;
+    --yellow: #fbbf24;
+    --yellow-dim: #3b2e0a;
+    --red: #f87171;
+    --red-dim: #3b1414;
+    --indigo: #818cf8;
+    --indigo-dim: #2e2a4d;
+    --cyan: #2dd4bf;
+    --cyan-dim: #1e3a3a;
+    --sky: #38bdf8;
+    --sky-dim: #0c4a6e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  .header { margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+  .header h1 { font-size: 18px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px; }
+  .header .sub { font-size: 11px; color: var(--text-dim); }
+  .header .source { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  .tabs { display: flex; gap: 2px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab {
+    background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    padding: 6px 14px; font-size: 11px; font-family: inherit; cursor: pointer;
+    border-radius: 3px; font-weight: 400; transition: all 0.1s;
+  }
+  .tab:hover { border-color: var(--border-hover); color: var(--text); }
+  .tab.active { background: var(--border); color: var(--text-bright); border-color: var(--border-hover); font-weight: 600; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .card {
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 12px; background: var(--surface); margin-bottom: 10px;
+  }
+
+  .section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .section-sub { font-size: 10px; color: var(--text-muted); margin-bottom: 8px; margin-top: -4px; }
+
+  .tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    background: var(--border); color: #94a3b8; white-space: nowrap;
+    display: inline-block;
+  }
+
+  .mini-card {
+    padding: 6px 10px; border-radius: 3px; background: #0a0a12;
+    min-width: 160px; flex: 1;
+  }
+  .mini-card .title { font-weight: 600; font-size: 11px; }
+  .mini-card .detail { font-size: 9px; color: var(--text-dim); line-height: 1.5; }
+  .mini-card .extra { font-size: 9px; color: #94a3b8; margin-top: 2px; }
+  .mini-card .warn { font-size: 9px; color: var(--yellow); margin-top: 2px; }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .grid-auto-sm { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+  .flex-col { display: flex; flex-direction: column; gap: 6px; }
+  .flex-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .flex-row-tight { display: flex; gap: 4px; flex-wrap: wrap; }
+  .arrow { text-align: center; color: var(--text-ghost); font-size: 10px; padding: 2px 0; }
+
+  .pipe-step { display: inline-flex; align-items: center; gap: 4px; }
+  .pipe-arrow { color: var(--text-ghost); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { text-align: left; padding: 6px 8px; color: var(--text-dim); font-weight: 600; font-size: 10px; border-bottom: 2px solid var(--border); }
+  td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  tr:nth-child(even) { background: #06060a; }
+
+  .issue {
+    margin-bottom: 6px; padding: 10px 14px; background: #0a0a10;
+    border-radius: 4px; border-left: 3px solid;
+  }
+  .issue .issue-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .issue .issue-title { color: var(--text-bright); font-weight: 600; font-size: 11px; }
+  .issue .issue-detail { font-size: 10px; color: #94a3b8; line-height: 1.5; }
+
+  .svc-box {
+    padding: 4px 8px; border-radius: 3px;
+  }
+  .svc-box .svc-name { font-weight: 600; font-size: 10px; }
+  .svc-box .svc-detail { font-size: 9px; color: var(--text-dim); }
+  .svc-box .svc-warn { font-size: 9px; }
+
+  .subnet-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 12px; margin-bottom: 3px; background: #0a0a10;
+    border: 1px solid var(--border); border-radius: 3px;
+  }
+  .subnet-bar { width: 4px; height: 24px; border-radius: 2px; }
+  .subnet-name { min-width: 170px; font-weight: 600; font-size: 11px; }
+  .subnet-purpose { flex: 1; font-size: 10px; color: #94a3b8; }
+
+  .ns-row {
+    margin-bottom: 4px; padding: 6px 10px; background: #0a0a10;
+    border: 1px solid var(--border); border-radius: 3px;
+  }
+  .ns-name { font-weight: 600; font-size: 11px; margin-right: 10px; }
+  .ns-pod { font-size: 10px; color: var(--text-dim); display: block; margin-left: 12px; }
+
+  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+  .footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 10px; color: var(--text-ghost); }
+
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  @media print {
+    body { background: white; color: #1a1a1a; padding: 12px; font-size: 9px; }
+    .tabs { display: none; }
+    .view { display: block !important; page-break-inside: avoid; margin-bottom: 24px; }
+    .card { border-color: #ccc; background: #fafafa; }
+    .tag { background: #eee; color: #333; }
+    .footer { color: #999; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Helios Platform — Deployment Architecture</h1>
+  <div class="sub">westus3 · VNet 10.120.0.0/16 · AKS 1.32.6 (10 nodes) · ArgoCD v3.3.0 · 8 apps synced · Generated 2026-03-06</div>
+  <div class="source">Sources: az cli + kubectl + gh cli (2026-03-06) · helios_dev_architecture.svg (Sudhir) · helios-infra repo · helios-gitops repo</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-view="architecture">Architecture</button>
+  <button class="tab" data-view="cluster">Cluster State</button>
+  <button class="tab" data-view="network">Network</button>
+  <button class="tab" data-view="cicd">CI/CD Matrix</button>
+  <button class="tab" data-view="issues">Issues (12)</button>
+</div>
+
+<!-- ======================== ARCHITECTURE ======================== -->
+<div id="architecture" class="view active">
+
+  <div class="grid-3">
+    <!-- External -->
+    <div class="card" style="border-color: var(--indigo-dim)">
+      <div class="section-title" style="color: var(--indigo)">external access</div>
+      <div class="flex-col">
+        <div class="mini-card" style="border: 1px solid #2e2a4d22">
+          <div class="title" style="color: var(--indigo)">Static Web App (Frontend)</div>
+          <div class="detail">React SPA · CDN edge · CORS enabled for App Service</div>
+          <div class="extra">desert-0147dd91e.2.azurestaticapps.net</div>
+        </div>
+        <div class="mini-card" style="border: 1px solid #2e2a4d22">
+          <div class="title" style="color: var(--indigo)">VPN Gateway</div>
+          <div class="detail">GatewaySubnet 10.120.5.0/24</div>
+          <div class="extra">Developer access to private resources</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monitoring -->
+    <div class="card" style="border-color: var(--cyan-dim)">
+      <div class="section-title" style="color: var(--cyan)">monitoring & observability</div>
+      <div class="flex-col">
+        <div class="mini-card" style="border: 1px solid #1e3a3a22"><div class="title" style="color: var(--cyan)">Container Insights</div><div class="detail">AKS monitoring · Data Collection Rules</div></div>
+        <div class="mini-card" style="border: 1px solid #1e3a3a22"><div class="title" style="color: var(--cyan)">Application Insights</div><div class="detail">App Service monitoring</div></div>
+        <div class="mini-card" style="border: 1px solid #1e3a3a22"><div class="title" style="color: var(--cyan)">Log Analytics Workspace</div><div class="detail">helios-dev-workspace · Central log aggregation</div></div>
+        <div class="mini-card" style="border: 1px solid #1e3a3a22"><div class="title" style="color: var(--cyan)">Azure Monitor AMPLS</div><div class="detail">PE on private-2 · Private link scope</div></div>
+      </div>
+    </div>
+
+    <!-- Security -->
+    <div class="card" style="border-color: var(--red-dim)">
+      <div class="section-title" style="color: var(--red)">security & identity</div>
+      <div class="flex-col">
+        <div class="mini-card" style="border: 1px solid #3b1e1e22"><div class="title" style="color: var(--red)">Key Vault</div><div class="detail">helios-dev-backend-kv · CMK Keys + Secrets · RBAC</div><div class="extra">PE on private-1</div></div>
+        <div class="mini-card" style="border: 1px solid #3b1e1e22"><div class="title" style="color: var(--red)">Entra ID App Registrations</div><div class="detail">helios-dev-ems-chat-agent · Platform App · QA App · Analytics App</div><div class="extra">Scopes: Agent.Call, User.Read</div></div>
+        <div class="mini-card" style="border: 1px solid #3b1e1e22"><div class="title" style="color: var(--red)">Managed Identities</div><div class="detail">Fabric SP · GitHub Actions SP · AI Foundry CMK UAMI · AKS VMSS Identity</div></div>
+        <div class="mini-card" style="border: 1px solid #3b1e1e22"><div class="title" style="color: var(--red)">UI Key Vault</div><div class="detail">heliosdev-ui-kv · PE on private-3</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">▼ frontend calls · certs/secrets · workload identity · private resolution</div>
+
+  <!-- Network Layer -->
+  <div class="card">
+    <div class="section-title" style="color: #94a3b8">network layer — helios-aks-dev-vnet 10.120.0.0/16</div>
+    <div class="section-sub">Single VNet · Hub-spoke · All PaaS via private endpoints · Private DNS zones (internal.com, *.privatelink.*)</div>
+    <div class="flex-row" id="subnet-pills"></div>
+  </div>
+
+  <div class="arrow">▼ API calls · integration · hosts</div>
+
+  <!-- Application & Compute -->
+  <div class="card" style="border-color: var(--green-dim)">
+    <div class="section-title" style="color: var(--green)">application & compute layer</div>
+
+    <div class="grid-2" style="margin-bottom: 10px">
+      <div style="padding: 8px 12px; border: 1px solid var(--blue-dim); border-radius: 4px; background: #0a1222">
+        <div style="color: var(--blue); font-weight: 600; font-size: 12px; margin-bottom: 4px">App Service</div>
+        <div style="font-size: 10px; color: #94a3b8">heliosdev-ui-appservice</div>
+        <div style="font-size: 10px; color: var(--text-dim)">VNet Integration + Private Endpoint</div>
+        <div style="font-size: 10px; color: var(--text-dim)">appservice-subnet · PE on private-1</div>
+      </div>
+      <div style="padding: 8px 12px; border: 1px solid var(--blue-dim); border-radius: 4px; background: #0a1222">
+        <div style="color: var(--blue); font-weight: 600; font-size: 12px; margin-bottom: 4px">API Management (Premium)</div>
+        <div style="font-size: 10px; color: #94a3b8">helios-dev-apim · Internal mode</div>
+        <div style="font-size: 10px; color: var(--text-dim)">apim-subnet 10.120.16.0/24 · NSG protected</div>
+        <div style="font-size: 10px; color: var(--text-dim)">Routes: digitaltwin, weather, iam, object-store</div>
+        <div style="font-size: 9px; color: var(--yellow); margin-top: 2px">⚠ No rate limiting, JWT, or versioning configured</div>
+      </div>
+    </div>
+
+    <!-- AKS -->
+    <div style="padding: 10px 12px; border: 1px solid var(--green-dim); border-radius: 4px; background: #081208">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+        <div>
+          <span style="color: var(--green); font-weight: 600; font-size: 12px">AKS Cluster</span>
+          <span style="font-size: 10px; color: var(--text-dim); margin-left: 8px">helios-dev-aks-cluster · K8s 1.32.6 · Azure CNI · Calico</span>
+        </div>
+        <span class="tag" style="background: var(--green-dim); color: var(--green)">ArgoCD v3.3.0</span>
+      </div>
+
+      <div class="flex-row" style="margin-bottom: 10px">
+        <span class="tag" style="background: var(--green-dim); color: var(--green)">System: 4x D4s_v6 (4-30)</span>
+        <span class="tag" style="background: var(--green-dim); color: var(--green)">User: 6x D4s_v6 (6-30)</span>
+        <span class="tag">Service CIDR 10.220.0.0/16</span>
+        <span class="tag">ingress-nginx LoadBalancer</span>
+      </div>
+
+      <div style="font-size: 10px; font-weight: 700; color: var(--green); margin-bottom: 4px; letter-spacing: 1px">ARGOCD MANAGED</div>
+      <div class="flex-row" style="margin-bottom: 8px">
+        <div class="svc-box" style="border: 1px solid #1e3a2e; background: #0a1a10"><div class="svc-name" style="color: var(--green)">digital-twin-api</div><div class="svc-detail">digital-twin · 1r · sha-fd1027f</div></div>
+        <div class="svc-box" style="border: 1px solid #1e3a2e; background: #0a1a10"><div class="svc-name" style="color: var(--green)">weather-service</div><div class="svc-detail">weather-service · 1r · sha-e56ae13</div></div>
+        <div class="svc-box" style="border: 1px solid #1e3a2e; background: #0a1a10"><div class="svc-name" style="color: var(--green)">object-store-service</div><div class="svc-detail">object-store-service · 1r · sha-5f169cc</div></div>
+      </div>
+
+      <div style="font-size: 10px; font-weight: 700; color: var(--yellow); margin-bottom: 4px; letter-spacing: 1px">NOT IN ARGOCD</div>
+      <div class="flex-row" style="margin-bottom: 8px">
+        <div class="svc-box" style="border: 1px solid var(--yellow-dim); background: #120e04"><div class="svc-name" style="color: var(--yellow)">iam-service</div><div class="svc-detail">iam-system · 2r · LoadBalancer</div><div class="svc-warn" style="color: var(--yellow)">⚠ Direct pod IP in APIM</div></div>
+        <div class="svc-box" style="border: 1px solid var(--yellow-dim); background: #120e04"><div class="svc-name" style="color: var(--yellow)">mock-services</div><div class="svc-detail">mock-services · 2r · ClusterIP</div><div class="svc-warn" style="color: var(--yellow)">⚠ Microcks + Swagger UI</div></div>
+        <div class="svc-box" style="border: 1px solid var(--yellow-dim); background: #120e04"><div class="svc-name" style="color: var(--yellow)">site-engine</div><div class="svc-detail">site-engine · 0r · —</div><div class="svc-warn" style="color: var(--yellow)">⚠ Namespace empty</div></div>
+      </div>
+
+      <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 1px">INFRASTRUCTURE</div>
+      <div class="flex-row-tight">
+        <span class="tag" style="background: #0f0f14; color: var(--text-muted)">argocd (7 pods)</span>
+        <span class="tag" style="background: #0f0f14; color: var(--text-muted)">ingress-nginx (1)</span>
+        <span class="tag" style="background: #0f0f14; color: var(--text-muted)">arc-systems (2)</span>
+        <span class="tag" style="background: #0f0f14; color: var(--text-muted)">arc-runners (0)</span>
+        <span class="tag" style="background: #0f0f14; color: var(--text-muted)">calico</span>
+        <span class="tag" style="background: #0f0f14; color: var(--text-muted)">kube-system</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">▼ publish/consume · DB access · stream ingestion · data access · tool/API access</div>
+
+  <!-- Bottom row: Data + AI + Storage -->
+  <div class="grid-3">
+    <div class="card" style="border-color: var(--purple-dim)">
+      <div class="section-title" style="color: var(--purple)">data & messaging</div>
+      <div class="flex-col">
+        <div class="mini-card" style="border: 1px solid #2e1a4d22"><div class="title" style="color: var(--purple)">EventHub Namespace (Premium)</div><div class="detail">helios-dev-eventhub-ns · PE on privateakssubnet</div><div class="extra">Topics: data-knowledgegraph · data-ontology · data-telemetry · data-optimizer-telemetry</div></div>
+        <div class="mini-card" style="border: 1px solid #2e1a4d22"><div class="title" style="color: var(--purple)">PostgreSQL Flexible Server</div><div class="detail">heliosdev-ui-postgres · v15 · UI backend DB</div><div class="extra">PE on private-2</div></div>
+        <div class="mini-card" style="border: 1px solid #2e1a4d22"><div class="title" style="color: var(--purple)">Azure Digital Twins</div><div class="detail">helios-dev-digitaltwin · PE on private-1</div><div class="extra">Datacenter topology modeling</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="border-color: var(--sky-dim)">
+      <div class="section-title" style="color: var(--sky)">ai & analytics</div>
+      <div class="flex-col">
+        <div class="mini-card" style="border: 1px solid #0c4a6e22"><div class="title" style="color: var(--sky)">Azure AI Foundry</div><div class="detail">CMK + UAMI · Private Endpoint on private-1</div><div class="extra">Shared across platform + EMS teams · Private cluster</div></div>
+        <div class="mini-card" style="border: 1px solid #0c4a6e22"><div class="title" style="color: var(--sky)">Microsoft Fabric</div><div class="detail">Capacity + Workspace · Managed Identity</div><div class="extra">Eventhouse, SQL, Lakehouse · Stream ingestion from EventHub</div></div>
+        <div class="mini-card" style="border: 1px solid #0c4a6e22"><div class="title" style="color: var(--sky)">Azure AI Search</div><div class="detail">Basic tier · Knowledge Base Indexing</div><div class="extra">KB retrieval for agents</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="border-color: var(--yellow-dim)">
+      <div class="section-title" style="color: var(--yellow)">storage & registry</div>
+      <div class="flex-col">
+        <div class="mini-card" style="border: 1px solid #3b2e0a22"><div class="title" style="color: var(--yellow)">ACR</div><div class="detail">heliosdevaksregistry · Standard</div><div class="extra">15 repos: 5 services + 5 stubs + 5 third-party</div></div>
+        <div class="mini-card" style="border: 1px solid #3b2e0a22"><div class="title" style="color: var(--yellow)">Storage: heliosdevapimlogssa</div><div class="detail">APIM diagnostic logs</div></div>
+        <div class="mini-card" style="border: 1px solid #3b2e0a22"><div class="title" style="color: var(--yellow)">Storage: helios-object-store</div><div class="detail">Blob · PE on private-1</div></div>
+        <div class="mini-card" style="border: 1px solid #3b2e0a22"><div class="title" style="color: var(--yellow)">Storage: heliosdevaifsa</div><div class="detail">AI Foundry storage · Blob · PE on private-1</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CI/CD Pipeline -->
+  <div class="card" style="border-color: var(--yellow-dim)">
+    <div class="section-title" style="color: var(--yellow)">delivery pipeline</div>
+    <div class="flex-row" style="margin-bottom: 6px; align-items: center">
+      <span class="tag">Push code</span><span class="pipe-arrow">→</span>
+      <span class="tag" style="background: var(--green-dim); color: var(--green)">GH Actions CI (arc-runners on AKS)</span><span class="pipe-arrow">→</span>
+      <span class="tag" style="background: var(--green-dim); color: var(--green)">Build + push ACR</span><span class="pipe-arrow">→</span>
+      <span class="tag" style="background: var(--yellow-dim); color: var(--yellow)">⚠ GitOps push-back (not wired)</span><span class="pipe-arrow">→</span>
+      <span class="tag" style="background: var(--purple-dim); color: var(--purple)">ArgoCD sync</span><span class="pipe-arrow">→</span>
+      <span class="tag" style="background: var(--green-dim); color: var(--green)">K8s rollout</span>
+    </div>
+    <div style="font-size: 10px; color: var(--yellow)">Self-hosted GH Actions runners on AKS (arc-runner-set). Builds use az acr build (no Docker daemon in pods).</div>
+    <div style="font-size: 10px; color: var(--yellow)">Outer loop broken: service CI doesn't call helios-gitops push-back workflow. Terraform has no pipeline.</div>
+  </div>
+</div>
+
+<!-- ======================== CLUSTER STATE ======================== -->
+<div id="cluster" class="view">
+  <div class="section-title" style="color: var(--green)">argocd applications — all synced/healthy</div>
+  <div style="overflow-x: auto; margin-bottom: 16px">
+    <table>
+      <thead><tr><th>App</th><th>Sync</th><th>Health</th><th>GitOps Path</th></tr></thead>
+      <tbody id="argo-table"></tbody>
+    </table>
+  </div>
+
+  <div class="section-title" style="color: var(--blue)">kubernetes services</div>
+  <div style="overflow-x: auto; margin-bottom: 16px">
+    <table>
+      <thead><tr><th>Namespace</th><th>Service</th><th>Type</th><th>ClusterIP</th><th>Port</th><th>Notes</th></tr></thead>
+      <tbody id="svc-table"></tbody>
+    </table>
+  </div>
+
+  <div class="section-title" style="color: var(--purple)">pods by namespace</div>
+  <div id="pods-list"></div>
+</div>
+
+<!-- ======================== NETWORK ======================== -->
+<div id="network" class="view">
+  <div class="section-title" style="color: var(--indigo)">vnet topology — helios-aks-dev-vnet 10.120.0.0/16</div>
+  <div id="subnet-list"></div>
+
+  <div class="section-title" style="color: var(--purple); margin-top: 16px">private dns zones</div>
+  <div class="flex-row" id="dns-zones"></div>
+
+  <div class="card" style="border-color: var(--yellow-dim); margin-top: 12px">
+    <div class="section-title" style="color: var(--yellow)">nsg audit</div>
+    <div style="font-size: 10px; color: var(--yellow); line-height: 1.8">
+      • 8 of 10 subnets have NO NSG — security relies entirely on private endpoints<br>
+      • AKS managed NSG rule "test": inbound :80 from * at priority 100 — wide open, likely leftover<br>
+      • AKS managed NSG "allow-apim-to-nodeports": APIM subnet to * with no port restriction<br>
+      • APIM NSG is well-configured: management endpoint, load balancer, outbound to SQL/Monitor/KeyVault/Storage
+    </div>
+  </div>
+</div>
+
+<!-- ======================== CI/CD MATRIX ======================== -->
+<div id="cicd" class="view">
+  <div class="section-title" style="color: var(--text-bright)">ci/cd status — all helios repos (29)</div>
+  <div class="flex-row" style="margin-bottom: 16px" id="cicd-summary"></div>
+  <div style="overflow-x: auto"><table><thead><tr><th></th><th>Repo</th><th>Workflows</th><th>Dockerfile</th><th>Status</th><th>Active</th><th>Deploy</th></tr></thead><tbody id="cicd-table"></tbody></table></div>
+</div>
+
+<!-- ======================== ISSUES ======================== -->
+<div id="issues" class="view">
+  <div class="section-title" style="color: var(--red)">infrastructure audit findings</div>
+  <div style="display: flex; gap: 12px; margin-bottom: 12px">
+    <span style="font-size: 11px"><span style="color: var(--red); font-weight: 700">4</span> <span style="color: var(--text-dim)">HIGH</span></span>
+    <span style="font-size: 11px"><span style="color: var(--yellow); font-weight: 700">6</span> <span style="color: var(--text-dim)">MED</span></span>
+    <span style="font-size: 11px"><span style="color: var(--text-dim); font-weight: 700">2</span> <span style="color: var(--text-dim)">LOW</span></span>
+  </div>
+  <div id="issues-list"></div>
+</div>
+
+<div class="footer">Sources: az cli + kubectl + gh cli (2026-03-06) · helios_dev_architecture.svg (Sudhir) · helios-infra repo · helios-gitops repo</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.view).classList.add('active');
+  });
+});
+
+// Subnet pills (architecture view)
+const subnetPills = [
+  { name: "GatewaySubnet", cidr: "10.120.5.0/24", color: "var(--indigo)" },
+  { name: "apim-subnet", cidr: "10.120.16.0/24", color: "var(--blue)" },
+  { name: "aks-nodepool", cidr: "10.120.12.0/22", color: "var(--green)" },
+  { name: "privateakssubnet", cidr: "10.120.6.0/23", color: "var(--green)" },
+  { name: "appservice", cidr: "10.120.17.0/24", color: "var(--purple)" },
+  { name: "private-1", cidr: "10.120.1.0/24", color: "var(--purple)" },
+  { name: "private-2", cidr: "10.120.2.0/24", color: "var(--purple)" },
+  { name: "private-3", cidr: "10.120.18.0/24", color: "var(--purple)" },
+  { name: "public-1", cidr: "10.120.3.0/24", color: "var(--text-muted)" },
+  { name: "public-2", cidr: "10.120.4.0/24", color: "var(--text-muted)" },
+];
+document.getElementById('subnet-pills').innerHTML = subnetPills.map(s =>
+  `<div style="display:flex;align-items:center;gap:4px"><div style="width:4px;height:14px;border-radius:1px;background:${s.color}"></div><span style="font-size:10px;color:${s.color}">${s.name}</span><span style="font-size:9px;color:var(--text-muted)">${s.cidr}</span></div>`
+).join('');
+
+// ArgoCD table
+const argoApps = [
+  { name: "root-app", path: "argocd/applicationsets" },
+  { name: "digital-twin-api", path: "apps/dev/digital-twin-api" },
+  { name: "weather-service", path: "apps/dev/weather-service" },
+  { name: "object-store-service", path: "apps/dev/object-store-service" },
+  { name: "argocd-notifications-config", path: "argocd/notifications" },
+  { name: "arc-runner-rbac-argocd", path: "apps/dev/arc-runner-rbac/argocd" },
+  { name: "arc-runner-rbac-digital-twin", path: "apps/dev/arc-runner-rbac/digital-twin" },
+  { name: "arc-runner-rbac-weather-service", path: "apps/dev/arc-runner-rbac/weather-service" },
+];
+document.getElementById('argo-table').innerHTML = argoApps.map(a =>
+  `<tr><td style="color:var(--text-bright);font-weight:500">${a.name}</td><td><span class="tag" style="background:var(--green-dim);color:var(--green)">Synced</span></td><td><span class="tag" style="background:var(--green-dim);color:var(--green)">Healthy</span></td><td style="color:var(--text-dim);font-size:10px">${a.path}</td></tr>`
+).join('');
+
+// K8s services table
+const k8sServices = [
+  { ns: "digital-twin", svc: "digital-twin-api", type: "ClusterIP", ip: "10.220.103.176", port: "8000", note: "", color: "var(--green)" },
+  { ns: "weather-service", svc: "weather-service", type: "ClusterIP", ip: "10.220.211.17", port: "8000", note: "", color: "var(--green)" },
+  { ns: "object-store-service", svc: "object-store-service", type: "ClusterIP", ip: "10.220.244.241", port: "8000", note: "", color: "var(--green)" },
+  { ns: "iam-system", svc: "iam-service", type: "LoadBalancer", ip: "10.220.106.55", port: "80", note: "⚠ Not in ArgoCD · LB type", color: "var(--yellow)" },
+  { ns: "ingress-nginx", svc: "ingress-nginx-controller", type: "LoadBalancer", ip: "10.220.220.75", port: "80,443", note: "Main ingress", color: "#94a3b8" },
+  { ns: "default", svc: "digital-twin-api", type: "ClusterIP", ip: "10.220.80.110", port: "8000", note: "⚠ ORPHANED duplicate", color: "var(--red)" },
+  { ns: "arc-runners", svc: "digital-twin-api", type: "ClusterIP", ip: "10.220.115.223", port: "8000", note: "⚠ ORPHANED duplicate", color: "var(--red)" },
+  { ns: "default", svc: "web", type: "LoadBalancer", ip: "10.220.115.145", port: "80", note: "⚠ Unknown owner", color: "var(--red)" },
+  { ns: "argocd", svc: "argocd-server", type: "ClusterIP", ip: "10.220.194.138", port: "80,443", note: "", color: "#94a3b8" },
+];
+document.getElementById('svc-table').innerHTML = k8sServices.map(s =>
+  `<tr><td style="color:var(--text-dim)">${s.ns}</td><td style="color:${s.color};font-weight:500">${s.svc}</td><td><span class="tag" style="${s.type==='LoadBalancer'?'background:var(--border);color:var(--text-bright)':'background:#0f0f14;color:var(--text-dim)'}">${s.type}</span></td><td style="color:var(--text-muted);font-size:10px">${s.ip}</td><td style="color:var(--text-muted)">${s.port}</td><td style="color:${s.note.includes('⚠')?'var(--yellow)':'var(--text-dim)'};font-size:10px">${s.note}</td></tr>`
+).join('');
+
+// Pods by namespace
+const nsPods = [
+  { ns: "digital-twin", pods: ["digital-twin-api-85cbf6d66f-w6mgg → sha-fd1027f · vmss000000"], color: "var(--purple)" },
+  { ns: "weather-service", pods: ["weather-service-6b598bfb95-kdv8p → sha-e56ae13 · vmss000002"], color: "var(--purple)" },
+  { ns: "object-store-service", pods: ["object-store-service-5dbc4f847d-4kdm2 → sha-5f169cc · vmss000004"], color: "var(--purple)" },
+  { ns: "iam-system", pods: ["iam-service-57c68b987c-kkcjn → 20260305-172012 · vmss000003", "iam-service-57c68b987c-zdnzm → 20260305-172012 · vmss000002"], color: "var(--purple)" },
+  { ns: "mock-services", pods: ["microcks-5cb84696d4-nfk5n · vmss000005", "swagger-ui-556ffc98fb-dr5f9 · vmss000000"], color: "var(--purple)" },
+  { ns: "argocd", pods: ["7 pods: controller, appset-controller, dex v2.44.0, notifications, redis 8.2.3, repo-server, server (all v3.3.0)"], color: "var(--purple)" },
+  { ns: "ingress-nginx", pods: ["ingress-nginx-controller-6676b54d4f-9g5hh → v1.14.1 · vmss000004"], color: "var(--purple)" },
+  { ns: "arc-systems", pods: ["arc-gha-rs-controller + arc-runner-set-listener (v0.13.1)"], color: "var(--purple)" },
+  { ns: "site-engine", pods: ["(empty — no pods)"], color: "var(--yellow)" },
+];
+document.getElementById('pods-list').innerHTML = nsPods.map(n =>
+  `<div class="ns-row"><span class="ns-name" style="color:${n.color}">${n.ns}</span>${n.pods.map(p=>`<span class="ns-pod">${p}</span>`).join('')}</div>`
+).join('');
+
+// Subnets (network view)
+const subnets = [
+  { name: "GatewaySubnet", cidr: "10.120.5.0/24", purpose: "VPN Gateway for developer access", nsg: false, cat: "access" },
+  { name: "apim-subnet", cidr: "10.120.16.0/24", purpose: "APIM Premium · Internal mode", nsg: true, cat: "gateway" },
+  { name: "aks-nodepool-subnet", cidr: "10.120.12.0/22", purpose: "AKS node pools (10 nodes: 4 system + 6 user)", nsg: false, cat: "compute" },
+  { name: "privateakssubnet", cidr: "10.120.6.0/23", purpose: "AKS API Server PE + EventHub PE", nsg: false, cat: "compute" },
+  { name: "appservice-subnet", cidr: "10.120.17.0/24", purpose: "UI backend App Service VNet integration", nsg: false, cat: "compute" },
+  { name: "private-1", cidr: "10.120.1.0/24", purpose: "PEs: KeyVault, Digital Twins, AI Foundry, AI Storage, Object Store, UI App Svc", nsg: false, cat: "pe" },
+  { name: "private-2", cidr: "10.120.2.0/24", purpose: "PEs: Azure Monitor AMPLS, UI PostgreSQL", nsg: false, cat: "pe" },
+  { name: "private-3", cidr: "10.120.18.0/24", purpose: "PE: UI Key Vault", nsg: false, cat: "pe" },
+  { name: "public-1", cidr: "10.120.3.0/24", purpose: "Unused / reserved", nsg: false, cat: "unused" },
+  { name: "public-2", cidr: "10.120.4.0/24", purpose: "Unused / reserved", nsg: false, cat: "unused" },
+];
+const catColors = { access: "var(--indigo)", gateway: "var(--blue)", compute: "var(--green)", pe: "var(--purple)", unused: "var(--text-ghost)" };
+document.getElementById('subnet-list').innerHTML = subnets.map(s =>
+  `<div class="subnet-row"><div class="subnet-bar" style="background:${catColors[s.cat]}"></div><div class="subnet-name" style="color:${catColors[s.cat]}">${s.name}</div><span class="tag">${s.cidr}</span><div class="subnet-purpose">${s.purpose}</div>${s.nsg?'<span class="tag" style="background:var(--green-dim);color:var(--green)">NSG ✓</span>':'<span class="tag" style="background:#1e1e24;color:var(--text-muted)">no NSG</span>'}</div>`
+).join('');
+
+// DNS zones
+const dnsZones = ["internal.com (4 records)", "azure-api.net", "privatelink.blob.core.windows.net (3)", "privatelink.digitaltwins.azure.net", "privatelink.servicebus.windows.net", "privatelink.azurewebsites.net (3)", "privatelink.postgres.database.azure.com (3)", "privatelink.vaultcore.azure.net (3)", "cognitiveservices.azure.com", "openai.azure.com", "services.ai.azure.com", "*.azmk8s.io (AKS API)"];
+document.getElementById('dns-zones').innerHTML = dnsZones.map(z => `<span class="tag" style="background:#1a0f2e;color:#a78bfa">${z}</span>`).join('');
+
+// CI/CD repos
+const repos = [
+  { repo: "Helios-UI", wf: "build-deploy-back, build-deploy-front, ci-mock, deploy-mock", df: false, st: "success", dt: "Mar 6", dp: "AKS + SWA", t: "green" },
+  { repo: "Helios-digital-twin-api", wf: "build-deploy-digital-api", df: false, st: "success", dt: "Mar 3", dp: "AKS (ArgoCD)", t: "green" },
+  { repo: "Helios-weather-service", wf: "build-deploy-weather, ci", df: true, st: "success", dt: "Mar 4", dp: "AKS (ArgoCD)", t: "green" },
+  { repo: "Helios-Object-Store-Service", wf: "cd, ci", df: true, st: "failure", dt: "Mar 6", dp: "AKS (ArgoCD)", t: "yellow" },
+  { repo: "Helios-site-engine", wf: "test", df: false, st: "success", dt: "Mar 6", dp: "No CD", t: "yellow" },
+  { repo: "Helios-optimization", wf: "julia_test", df: true, st: "success", dt: "Mar 5", dp: "No CD", t: "yellow" },
+  { repo: "Helios-ai-agents", wf: "EMS Chat Agent CI/CD", df: false, st: "mixed", dt: "Mar 6", dp: "Unclear", t: "yellow" },
+  { repo: "Helios-release-orchestrator", wf: "9 workflows", df: false, st: "success", dt: "Mar 6", dp: "Orchestration", t: "green" },
+  { repo: "helios-gitops", wf: "update-gitops-tag", df: false, st: "success", dt: "Mar 3", dp: "ArgoCD config", t: "green" },
+  { repo: "helios-data-ontology", wf: "deploy-fabric-notebooks + 3", df: false, st: "mixed", dt: "Mar 5", dp: "Fabric", t: "yellow" },
+  { repo: "helios-data-knowledgegraph", wf: "backend-tests, docker-build", df: false, st: "mixed", dt: "Mar 4", dp: "Fabric Eventstream", t: "yellow" },
+  { repo: "helios-data-cdc-processor", wf: "ci, rdf-cdc", df: false, st: "failure", dt: "Mar 6", dp: "Failing", t: "red" },
+  { repo: "helios-data-kusto", wf: "docker-build, schema-change", df: false, st: "failure", dt: "Mar 5", dp: "Failing", t: "red" },
+  { repo: "Helios-data-nlp-mcp", wf: "(deleted)", df: false, st: "failure", dt: "Mar 5", dp: "All failing", t: "red" },
+  { repo: "helios-infra", wf: "Terraform-rg", df: false, st: "cancelled", dt: "Feb 12", dp: "Manual only", t: "red" },
+  { repo: "Helios-infra-iac", wf: "Terraform", df: false, st: "failure", dt: "Jan 30", dp: "Broken", t: "red" },
+  { repo: "helios-iam-service", wf: "none", df: true, st: "—", dt: "Feb 25", dp: "No CI/CD — running", t: "red" },
+  { repo: "helios-onboarding-agent-backend", wf: "none", df: true, st: "—", dt: "never", dp: "None", t: "gray" },
+  { repo: "helios-qre-intelligence", wf: "(deleted)", df: false, st: "—", dt: "Mar 5", dp: "None", t: "gray" },
+  { repo: "helios-iam-data", wf: "deploy-fabric-sql", df: false, st: "—", dt: "never", dp: "None", t: "gray" },
+  { repo: "helios-sop-agent-service", wf: "EMPTY", df: false, st: "—", dt: "—", dp: "Empty", t: "gray" },
+  { repo: "Helios-sre-qa", wf: "EMPTY", df: false, st: "—", dt: "—", dp: "Empty", t: "gray" },
+  { repo: "helios-mocking-data", wf: "backend-tests", df: false, st: "failure", dt: "Feb 11", dp: "Stale", t: "gray" },
+  { repo: "Helios-optimization-model-fitting", wf: "backend-tests", df: false, st: "failure", dt: "Feb 17", dp: "Stale", t: "gray" },
+  { repo: "Helios-kg-shacl-validator", wf: "backend-tests", df: false, st: "failure", dt: "Jan 28", dp: "Stale", t: "gray" },
+  { repo: "Helios-rdf-git-action", wf: "backend-tests, docker-build", df: false, st: "failure", dt: "Jan 27", dp: "Stale", t: "gray" },
+  { repo: "Helios-telemetry-kg-manager", wf: "backend-tests", df: false, st: "failure", dt: "Jan 26", dp: "Stale", t: "gray" },
+  { repo: "Helios-rdf-processor", wf: "backend-tests, docker-build", df: false, st: "failure", dt: "Jan 23", dp: "Stale", t: "gray" },
+  { repo: "Helios-notification-service", wf: "backend-tests, docker-build", df: false, st: "failure", dt: "Jan 23", dp: "Stale", t: "gray" },
+];
+
+const tc = { green: { text: "#4ade80", dot: "#22c55e" }, yellow: { text: "#fbbf24", dot: "#eab308" }, red: { text: "#f87171", dot: "#ef4444" }, gray: { text: "#64748b", dot: "#475569" } };
+const stc = { success: "var(--green)", failure: "var(--red)", mixed: "var(--yellow)", cancelled: "var(--yellow)", "—": "var(--text-muted)" };
+
+const counts = { green: 0, yellow: 0, red: 0, gray: 0 };
+repos.forEach(r => counts[r.t]++);
+document.getElementById('cicd-summary').innerHTML = [
+  { label: "Full CI+CD", count: counts.green, color: "var(--green)" },
+  { label: "Partial", count: counts.yellow, color: "var(--yellow)" },
+  { label: "Broken / No pipeline", count: counts.red, color: "var(--red)" },
+  { label: "Stale / Empty", count: counts.gray, color: "var(--text-dim)" },
+].map(s => `<div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:2px;background:${s.color}"></div><span style="font-size:12px;color:${s.color};font-weight:700">${s.count}</span><span style="font-size:11px;color:var(--text-dim)">${s.label}</span></div>`).join('');
+
+document.getElementById('cicd-table').innerHTML = repos.map(r =>
+  `<tr><td><span class="dot" style="background:${tc[r.t].dot}"></span></td><td style="color:${tc[r.t].text};font-weight:500;white-space:nowrap">${r.repo}</td><td style="color:#94a3b8;font-size:10px;max-width:220px">${r.wf}</td><td>${r.df?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--text-ghost)">—</span>'}</td><td style="color:${stc[r.st]||'var(--text-muted)'}">${r.st}</td><td style="color:var(--text-dim)">${r.dt}</td><td style="color:${tc[r.t].text};font-size:10px">${r.dp}</td></tr>`
+).join('');
+
+// Issues
+const issuesList = [
+  { sev: "HIGH", title: "IAM Service APIM routing uses direct pod IP", detail: "APIM backend for iam-api is http://10.120.6.123/api — a node IP in AKS subnet. IAM LoadBalancer is 10.220.106.55:80. Will break on pod reschedule.", color: "var(--red)" },
+  { sev: "HIGH", title: "IAM Service not managed by ArgoCD", detail: "iam-system ns has 2 pods but no ArgoCD Application. Only service using LoadBalancer type, bypassing nginx ingress. Deployed manually.", color: "var(--red)" },
+  { sev: "HIGH", title: "Terraform has no CI/CD pipeline", detail: "helios-infra last success: Feb 10. Helios-infra-iac last run: Jan 30 (failed). All infra changes manual. Two repos — unclear which is canonical.", color: "var(--red)" },
+  { sev: "HIGH", title: "Service CI → GitOps push-back not wired", detail: "Reusable workflow update-gitops-tag.yaml exists but not called by service CI. Image promotions are manual PRs.", color: "var(--red)" },
+  { sev: "MED", title: "digital-twin-api service in 3 namespaces", detail: "ClusterIP services in default, digital-twin, and arc-runners. Real pod is in digital-twin. Others orphaned.", color: "var(--yellow)" },
+  { sev: "MED", title: "No NSGs on 8 of 10 subnets", detail: "private-1/2/3, public-1/2, aks-nodepool-subnet, privateakssubnet, appservice-subnet unprotected.", color: "var(--yellow)" },
+  { sev: "MED", title: "AKS NSG rule 'test' allows inbound :80 from *", detail: "Priority 100 — wide open. Named 'test', likely leftover from debugging.", color: "var(--yellow)" },
+  { sev: "MED", title: "Stale PR namespaces still running", detail: "mock-services-pr-19 and mock-services-pr-28 have pods from merged PRs.", color: "var(--yellow)" },
+  { sev: "MED", title: "'web' LoadBalancer in default namespace", detail: "Service named 'web' (LB :80) — no clear owner.", color: "var(--yellow)" },
+  { sev: "MED", title: "site-engine namespace empty", detail: "Namespace exists, ACR image exists, CI passing, but no pod and no ArgoCD app.", color: "var(--yellow)" },
+  { sev: "LOW", title: "13 repos inactive since January", detail: "SpecKit-generated workflows that never worked. Candidates for cleanup.", color: "var(--text-dim)" },
+  { sev: "LOW", title: "weather-api APIM path is root '/'", detail: "Root path mapping overly broad.", color: "var(--text-dim)" },
+];
+document.getElementById('issues-list').innerHTML = issuesList.map(i =>
+  `<div class="issue" style="border-color:${i.color};border:1px solid ${i.color}22"><div class="issue-header"><span class="tag" style="background:${i.color}22;color:${i.color}">${i.sev}</span><span class="issue-title">${i.title}</span></div><div class="issue-detail">${i.detail}</div></div>`
+).join('');
+</script>
+</body>
+</html>
